@@ -1,0 +1,4 @@
+faster-whisper>=1.0.3
+pydub>=0.25.1
+audioop-lts>=0.2.1; python_version >= "3.13"
+pytest>=8.0
