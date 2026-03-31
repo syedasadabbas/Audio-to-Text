@@ -65,11 +65,11 @@ The task is to take arbitrary audio — any format, any length, any quality — 
 
 ### Why faster-whisper
 
-The first decision was which engine to use. OpenAI Whisper is the obvious choice for accuracy, but the reference `openai-whisper` package has real drawbacks for a batch pipeline: it runs inference in float32, which is slow on CPU, and it loads the full PyTorch graph into memory for every file.
+The first decision was which engine to use. OpenAI Whisper is the obvious choice for accuracy, but the reference `openai-whisper` package has real drawbacks for a batch pipeline: it runs inference in float32, which is slow on CPU and it loads the full PyTorch graph into memory for every file.
 
 `faster-whisper` uses CTranslate2 as its inference backend, which gives int8 quantization on CPU and float16 on GPU. The practical result: the `base` model transcribes a 10-minute file in around 30 seconds on a mid-range laptop CPU, compared to ~2 minutes with openai-whisper on the same hardware. The accuracy on clean speech is identical. On GPU, int8/float16 inference is even faster and the gap widens.
 
-Two other things that come for free with faster-whisper: built-in VAD (voice activity detection) that automatically skips silent regions, and word-level timestamps in the same pass — no second model, no separate alignment step.
+Two other things that come for free with faster-whisper: built-in VAD (voice activity detection) that automatically skips silent regions and word-level timestamps in the same pass — no second model, no separate alignment step.
 
 ### Handling long files: chunking with overlap
 
@@ -95,7 +95,7 @@ The raw log-probability isn't intuitive to work with, so it's mapped to a 0–1 
 
 ### Separation of concerns
 
-`audio_processor.py` handles everything up to getting audio into memory in the right format. `transcriber.py` handles everything from there to producing structured output. Neither module knows about the other's internals. This means swapping the transcription engine (e.g. replacing Whisper with a cloud API) only touches `transcriber.py`, and switching the audio loading library only touches `audio_processor.py`.
+`audio_processor.py` handles everything up to getting audio into memory in the right format. `transcriber.py` handles everything from there to producing structured output. Neither module knows about the other's internals. This means swapping the transcription engine (e.g. replacing Whisper with a cloud API) only touches `transcriber.py` and switching the audio loading library only touches `audio_processor.py`.
 
 ---
 
@@ -108,7 +108,7 @@ The raw log-probability isn't intuitive to work with, so it's mapped to a 0–1 
 ├── main.py                 # CLI entry point
 ├── test_pipeline.py        # unit and integration tests
 ├── requirements.txt
-└── app/                    # desktop GUI (separate from the submission)
+└── app/                    # desktop GUI (additional)
 ```
 
 ---
@@ -143,15 +143,15 @@ Unit tests mock `WhisperModel` directly so they run offline without downloading 
 
 For a production deployment the pipeline maps onto an async worker architecture:
 
-- The API layer accepts an upload, enqueues a job, and returns a `job_id` immediately — the HTTP request doesn't wait for transcription to complete.
-- Workers pull jobs from the queue (Celery + Redis, SQS + Lambda, etc.), run the pipeline, and write results to the database.
+- The API layer accepts an upload, enqueues a job and returns a `job_id` immediately — the HTTP request doesn't wait for transcription to complete.
+- Workers pull jobs from the queue (Celery + Redis, SQS + Lambda, etc.), run the pipeline and write results to the database.
 - Raw audio lives in object storage (S3/GCS). The DB stores the key, not the file itself.
 - Failures retry with exponential backoff up to N attempts; exhausted jobs move to a dead-letter queue for inspection.
 - Status transitions (`pending → processing → completed / failed`) are atomic — there's always a consistent view even if a worker dies mid-run.
 
 ---
 
-## Bonus: Desktop App
+## Additional (out of assessment's scope): Desktop App
 
 The `app/` directory has a customtkinter GUI built on top of the same pipeline. It's extra work beyond the core submission.
 
